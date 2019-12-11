@@ -169,7 +169,7 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 
 		finalName := strings.TrimPrefix(name, "/")
 		//logrus.Infof("LS File: %q, Size: %d, IsPrefix: %v, Owner: %q, Last Modifier: %q", finalName, *object.Size,isPrefix, owner,*object.LastModified)
-
+		fileSize := *object.Size
 		if isPrefix {
 			//check if already added
 			if _, ok := folders[finalName]; ok {
@@ -177,11 +177,12 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 			} else {
 				folders[finalName] = struct{}{}
 			}
+			fileSize = -1
 		}
 
 		err = cb(S3ObjectInfo{
 			name:     finalName,
-			size:     *object.Size,
+			size:     fileSize,
 			owner:    owner,
 			modTime:  *object.LastModified,
 			isPrefix: isPrefix,
