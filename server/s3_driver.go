@@ -62,7 +62,7 @@ func (d S3Driver) bucketCheck() error {
 
 // Init initializes the FTP connection.
 func (d S3Driver) Init(conn *ftp.Conn) {
-	conn.Serve()
+	
 }
 
 // Stat returns information about the object with key `key`.
