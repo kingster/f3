@@ -26,7 +26,11 @@ func (s S3ObjectInfo) Size() int64 {
 
 // Mode returns `o644` for all objects because there is no file mode equivalent for s3 objects.
 func (s S3ObjectInfo) Mode() os.FileMode {
-	return os.FileMode(0644)
+	if s.IsDir() {
+		return os.ModeDir
+	} else {
+		return os.FileMode(0644)
+	}
 }
 
 // IsDir is solely used for compatibility with FTP, don't rely on its return value.
