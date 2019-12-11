@@ -149,7 +149,7 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		name := *object.Key
 
 		if prefixKey != "" {
-			if !strings.HasPrefix(name, prefixKey){
+			if !strings.HasPrefix(name, prefixKey) {
 				continue
 			} else {
 				name = strings.TrimPrefix(name, prefixKey)
@@ -162,12 +162,12 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		}
 
 		isPrefix := false
-		if trimName := strings.TrimPrefix(name, "/"); strings.Contains(trimName, "/"){
+		if trimName := strings.TrimPrefix(name, "/"); strings.Contains(trimName, "/") {
 			isPrefix = true
 			name = strings.Split(name, "/")[0]
 		}
 
-		finalName :=  strings.TrimPrefix(name, "/")
+		finalName := strings.TrimPrefix(name, "/")
 		//logrus.Infof("LS File: %q, Size: %d, IsPrefix: %v, Owner: %q, Last Modifier: %q", finalName, *object.Size,isPrefix, owner,*object.LastModified)
 
 		if isPrefix {
@@ -180,17 +180,19 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		}
 
 		err = cb(S3ObjectInfo{
-			name:    finalName,
-			size:    *object.Size,
-			owner:   owner,
-			modTime: *object.LastModified,
+			name:     finalName,
+			size:     *object.Size,
+			owner:    owner,
+			modTime:  *object.LastModified,
 			isPrefix: isPrefix,
 		})
 
 		if err != nil {
 			logrus.WithFields(logrus.Fields{"time": time.Now(), "error": err}).Errorf("Could not list %q", d.fqdn(name))
 		}
+
 	}
+	logrus.WithFields(logrus.Fields{"time": time.Now(), "key": key, "action": "LS"}).Infof("Directory listing for %q", key)
 	return nil
 }
 

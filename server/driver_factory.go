@@ -3,6 +3,9 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/request"
+	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
+	"github.com/spreadshirt/f3/s3ext"
 	"net/url"
 	"strings"
 
@@ -30,12 +33,14 @@ type DriverFactory struct {
 	noOverwrite       bool
 	awsCredentials    *credentials.Credentials
 	s3PathStyle       bool
+	s3SignatureV2     bool
 	s3Region          string
 	s3Endpoint        string
 	hostname          string
 	bucketName        string
 	bucketURL         *url.URL
 	DisableCloudWatch bool
+	DisableSSL        bool
 }
 
 // NewDriver returns a new FTP driver.
@@ -46,11 +51,22 @@ func (d DriverFactory) NewDriver() (ftp.Driver, error) {
 		S3ForcePathStyle: aws.Bool(d.s3PathStyle),
 		Endpoint:         aws.String(d.s3Endpoint),
 		Credentials:      d.awsCredentials,
+		DisableSSL:       aws.Bool(d.DisableSSL),
 	})
 	if err != nil {
 		return nil, goErrors.Wrapf(err, "Failed to instantiate driver")
 	}
 	s3Client := s3.New(s3Session)
+
+	if d.s3SignatureV2 {
+		logrus.Debug("Using Signature V2 Format")
+		s3Client.Handlers.Sign.Swap(v4.SignRequestHandler.Name, request.NamedHandler{
+			Name: "v2Signer",
+			Fn: func(req *request.Request) {
+				s3ext.SignV2(req)
+			},
+		})
+	}
 
 	var metricsSender MetricsSender
 	if d.DisableCloudWatch {
@@ -87,8 +103,11 @@ type FactoryConfig struct {
 	S3Credentials     string
 	S3BucketURL       string
 	S3Region          string
+	S3Endpoint        string
 	S3UsePathStyle    bool
+	S3SignatureV2     bool
 	DisableCloudWatch bool
+	S3DisableSSL      bool
 }
 
 // NewDriverFactory returns a DriverFactory.
@@ -177,16 +196,24 @@ func setupS3(config *FactoryConfig, factory *DriverFactory, err error) (*Factory
 	}
 	factory.bucketURL = bucketURL
 
-	// retrieve bucket name and endpoint from bucket FQDN
-	pair = strings.SplitN(bucketURL.Host, ".", 2)
-	if len(pair) != 2 {
-		return config, factory, fmt.Errorf("Not a fully qualified bucket name (e.g. 'bucket.host.domain'): %q", bucketURL.String())
+	if config.S3Endpoint == "" {
+		// retrieve bucket name and endpoint from bucket FQDN
+		pair = strings.SplitN(bucketURL.Host, ".", 2)
+		if len(pair) != 2 {
+			return config, factory, fmt.Errorf("Not a fully qualified bucket name (e.g. 'bucket.host.domain'): %q", bucketURL.String())
+		}
+		bucketName, endpoint := pair[0], fmt.Sprintf("%s://%s", bucketURL.Scheme, pair[1])
+		factory.bucketName = bucketName
+		factory.s3Endpoint = endpoint
+	} else {
+		factory.bucketName = bucketURL.Host
+		factory.s3Endpoint = config.S3Endpoint
 	}
-	bucketName, endpoint := pair[0], fmt.Sprintf("%s://%s", bucketURL.Scheme, pair[1])
-	factory.bucketName = bucketName
-	factory.s3Endpoint = endpoint
+
 	factory.s3Region = config.S3Region
 	factory.s3PathStyle = config.S3UsePathStyle
+	factory.s3SignatureV2 = config.S3SignatureV2
+	factory.DisableSSL = config.S3DisableSSL
 
 	return config, factory, nil
 }

@@ -3,7 +3,7 @@ module github.com/spreadshirt/f3
 require (
 	github.com/aws/aws-sdk-go v1.17.10
 	github.com/goftp/file-driver v0.0.0-20180502053751-5d604a0fc0c9 // indirect
-	github.com/goftp/server v0.0.0-20190304020633-eabccc535b5a
+	github.com/goftp/server v0.0.0-20190712054601-1149070ae46b
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jlaffaye/ftp v0.0.0-20190126081051-8019e6774408 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -17,3 +17,5 @@ require (
 	golang.org/x/sys v0.0.0-20190305064518-30e92a19ae4a // indirect
 	golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 // indirect
 )
+
+go 1.13

@@ -26,8 +26,12 @@ type cliFlags struct {
 	s3Credentials       string
 	s3Bucket            string
 	s3Region            string
+	s3Endpoint          string
+	s3pathStyle         bool
 	disableCloudwatch   bool
 	verbose             bool
+	s3SignatureV2       bool
+	s3DisableSSL        bool
 }
 
 func main() {
@@ -65,8 +69,12 @@ See https://github.com/spreadshirt/f3 for details.`,
 	cmd.PersistentFlags().StringVar(&flags.s3Credentials, "s3-credentials", "", "AccessKey:SecretKey, overrides $S3_CREDENTIALS")
 	cmd.PersistentFlags().StringVar(&flags.s3Bucket, "s3-bucket", "", "URL of the s3 bucket, e.g. https://some-bucket.s3.amazonaws.com, overrides $S3_BUCKET")
 	cmd.PersistentFlags().StringVar(&flags.s3Region, "s3-region", server.DefaultRegion, "Region where the s3 bucket is located in, overrides $S3_REGION")
-	cmd.PersistentFlags().BoolVar(&flags.disableCloudwatch, "disable-cloudwatch", false, "Disable CloudWatch metrics")
+	cmd.PersistentFlags().BoolVar(&flags.disableCloudwatch, "disable-cloudwatch", true, "Disable CloudWatch metrics")
 	cmd.PersistentFlags().BoolVarP(&flags.verbose, "verbose", "v", false, "Print what is being done")
+	cmd.PersistentFlags().StringVar(&flags.s3Endpoint, "s3-endpoint", "", "S3 endpoint")
+	cmd.PersistentFlags().BoolVar(&flags.s3SignatureV2, "s3-signatureV2", false, "S3SignatureV2")
+	cmd.PersistentFlags().BoolVar(&flags.s3pathStyle, "s3-pathStyle", false, "S3 PathStyle")
+	cmd.PersistentFlags().BoolVar(&flags.s3DisableSSL, "s3-disableSSL", false, "S3 DisableSSL")
 
 	err := cmd.Execute()
 	if err != nil {
@@ -97,7 +105,11 @@ func run(credentialsFilename string, flags cliFlags) error {
 		S3Credentials:     getEnvOrDefault("S3_CREDENTIALS", flags.s3Credentials),
 		S3BucketURL:       getEnvOrDefault("S3_BUCKET", flags.s3Bucket),
 		S3Region:          getEnvOrDefault("S3_REGION", flags.s3Region),
+		S3Endpoint:        getEnvOrDefault("S3_ENDPOINT", flags.s3Endpoint),
+		S3UsePathStyle:    getEnvOrDefaultBool("S3_PATHSTYLE", flags.s3pathStyle),
 		DisableCloudWatch: flags.disableCloudwatch,
+		S3SignatureV2:     flags.s3SignatureV2,
+		S3DisableSSL:      flags.s3DisableSSL,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to instantiate new driver factory")
@@ -143,6 +155,18 @@ func splitFtpAddr(addr string) (string, int, error) {
 func getEnvOrDefault(key, defaultValue string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
+	}
+	return defaultValue
+}
+
+func getEnvOrDefaultBool(key string, defaultValue bool) bool {
+	if val := os.Getenv(key); val != "" {
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			logrus.Errorf("Boolean Parse Error Key: %q Value : %q", key, val)
+			return defaultValue
+		}
+		return b
 	}
 	return defaultValue
 }
