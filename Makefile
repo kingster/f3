@@ -29,7 +29,8 @@ endif
 
 deb: f3 test
 	mkdir -p deb/usr/sbin
-	cp f3 deb/usr/sbin
+	@CGO_ENABLED=0 GOOS=linux GOARCH=386 go build $(GO_FLAGS) -o f3.linux ./cmd/f3
+	cp f3.linux deb/usr/sbin/f3
 	fpm --force\
 		--input-type dir\
 		--output-type deb\

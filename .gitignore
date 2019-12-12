@@ -2,6 +2,7 @@
 /.idea/
 /.go/
 /f3
+/f3.linux
 /deb/usr/sbin
 /f3*.deb
 /.vagrant/
