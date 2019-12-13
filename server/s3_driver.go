@@ -164,7 +164,7 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		isPrefix := false
 		if trimName := strings.TrimPrefix(name, "/"); strings.Contains(trimName, "/") {
 			isPrefix = true
-			name = strings.Split(name, "/")[0]
+			name = strings.Split(trimName, "/")[0]
 		}
 
 		finalName := strings.TrimPrefix(name, "/")
@@ -177,7 +177,7 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 			} else {
 				folders[finalName] = struct{}{}
 			}
-			fileSize = -1
+			fileSize = 0
 		}
 
 		err = cb(S3ObjectInfo{
