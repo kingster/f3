@@ -62,7 +62,7 @@ func (d S3Driver) bucketCheck() error {
 
 // Init initializes the FTP connection.
 func (d S3Driver) Init(conn *ftp.Conn) {
-	
+
 }
 
 // Stat returns information about the object with key `key`.
@@ -132,9 +132,66 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		return errors.Wrapf(err, "Bucket check failed")
 	}
 
-	resp, err := d.s3.ListObjects(&s3.ListObjectsInput{
+	listParams := &s3.ListObjectsInput{
 		Bucket: aws.String(d.bucketName),
+	}
+
+	prefixKey := strings.TrimPrefix(key, "/")
+	folders := make(map[string]struct{})
+
+	err := d.s3.ListObjectsPages(listParams, func(page *s3.ListObjectsOutput, lastPage bool) bool {
+
+		for _, object := range page.Contents {
+			name := *object.Key
+
+			if prefixKey != "" {
+				if !strings.HasPrefix(name, prefixKey) {
+					continue
+				} else {
+					name = strings.TrimPrefix(name, prefixKey)
+				}
+			}
+
+			owner := ""
+			if object.Owner != nil {
+				owner = *object.Owner.ID
+			}
+
+			isPrefix := false
+			if trimName := strings.TrimPrefix(name, "/"); strings.Contains(trimName, "/") {
+				isPrefix = true
+				name = strings.Split(trimName, "/")[0]
+			}
+
+			finalName := strings.TrimPrefix(name, "/")
+			//logrus.Infof("LS File: %q, Size: %d, IsPrefix: %v, Owner: %q, Last Modifier: %q", finalName, *object.Size,isPrefix, owner,*object.LastModified)
+			fileSize := *object.Size
+			if isPrefix {
+				//check if already added
+				if _, ok := folders[finalName]; ok {
+					continue
+				} else {
+					folders[finalName] = struct{}{}
+				}
+				fileSize = 0
+			}
+
+			err := cb(S3ObjectInfo{
+				name:     finalName,
+				size:     fileSize,
+				owner:    owner,
+				modTime:  *object.LastModified,
+				isPrefix: isPrefix,
+			})
+
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"time": time.Now(), "error": err}).Errorf("Could not list %q", d.fqdn(name))
+			}
+		}
+		// return if we should continue with the next page
+		return !lastPage
 	})
+
 	if err != nil {
 		err := intoAwsError(err)
 		fqdn := d.fqdn(key)
@@ -142,57 +199,7 @@ func (d S3Driver) ListDir(key string, cb func(ftp.FileInfo) error) error {
 		logrus.Errorf("Could not list %q.", fqdn)
 		return err
 	}
-	prefixKey := strings.TrimPrefix(key, "/")
-	folders := make(map[string]struct{})
 
-	for _, object := range resp.Contents {
-		name := *object.Key
-
-		if prefixKey != "" {
-			if !strings.HasPrefix(name, prefixKey) {
-				continue
-			} else {
-				name = strings.TrimPrefix(name, prefixKey)
-			}
-		}
-
-		owner := ""
-		if object.Owner != nil {
-			owner = *object.Owner.ID
-		}
-
-		isPrefix := false
-		if trimName := strings.TrimPrefix(name, "/"); strings.Contains(trimName, "/") {
-			isPrefix = true
-			name = strings.Split(trimName, "/")[0]
-		}
-
-		finalName := strings.TrimPrefix(name, "/")
-		//logrus.Infof("LS File: %q, Size: %d, IsPrefix: %v, Owner: %q, Last Modifier: %q", finalName, *object.Size,isPrefix, owner,*object.LastModified)
-		fileSize := *object.Size
-		if isPrefix {
-			//check if already added
-			if _, ok := folders[finalName]; ok {
-				continue
-			} else {
-				folders[finalName] = struct{}{}
-			}
-			fileSize = 0
-		}
-
-		err = cb(S3ObjectInfo{
-			name:     finalName,
-			size:     fileSize,
-			owner:    owner,
-			modTime:  *object.LastModified,
-			isPrefix: isPrefix,
-		})
-
-		if err != nil {
-			logrus.WithFields(logrus.Fields{"time": time.Now(), "error": err}).Errorf("Could not list %q", d.fqdn(name))
-		}
-
-	}
 	logrus.WithFields(logrus.Fields{"time": time.Now(), "key": key, "action": "LS"}).Infof("Directory listing for %q", key)
 	return nil
 }

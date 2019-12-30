@@ -174,6 +174,29 @@ func (mock *s3Mock) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutp
 	return &s3.ListObjectsOutput{Contents: contents}, nil
 }
 
+
+func (mock *s3Mock) ListObjectsPages(input *s3.ListObjectsInput, fn func(page *s3.ListObjectsOutput, lastPage bool) bool ) error {
+	if err := input.Validate(); err != nil {
+		return err
+	}
+
+	contents := []*s3.Object{}
+	prefix := aws.StringValue(input.Prefix)
+	for key, object := range mock.bucket.List() {
+		if strings.HasPrefix(key, prefix) {
+			contents = append(contents, &s3.Object{
+				ETag:         aws.String(object.etag),
+				Key:          aws.String(key),
+				LastModified: &object.lastMod,
+				Size:         aws.Int64(int64(len(object.data))),
+			})
+		}
+	}
+
+	fn(&s3.ListObjectsOutput{Contents: contents}, true)
+	return nil
+}
+
 func (mock *s3Mock) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
 	if err := input.Validate(); err != nil {
 		return nil, err
